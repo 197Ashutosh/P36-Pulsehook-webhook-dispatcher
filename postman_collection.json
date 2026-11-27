@@ -1,0 +1,109 @@
+{
+  "info": {
+    "name": "PulseHook — Distributed Webhook Dispatcher",
+    "description": "Collection for testing PulseHook non-blocking webhook ingestion, exponential backoff retries, rate limiting, DLQ replay, and observability.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "jobId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Dispatch Webhook (Healthy 200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 202 Accepted', () => pm.response.to.have.status(202));",
+              "const json = pm.response.json();",
+              "if (json.jobId) pm.collectionVariables.set('jobId', json.jobId);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/api/mock/receiver?mode=ok\",\n  \"eventId\": \"evt_{{$timestamp}}\",\n  \"payload\": {\n    \"event\": \"user.signup\",\n    \"userId\": \"usr_999\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/webhooks/dispatch"
+      }
+    },
+    {
+      "name": "2. Dispatch Slow Downstream (10s Non-Blocking Test)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/api/mock/receiver?mode=slow&delayMs=10000\",\n  \"eventId\": \"evt_slow_{{$timestamp}}\",\n  \"payload\": {\n    \"event\": \"invoice.generated\",\n    \"userId\": \"usr_999\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/webhooks/dispatch"
+      }
+    },
+    {
+      "name": "3. Dispatch Flaky Target (Fails 2x, Succeeds on 3rd)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/api/mock/receiver?mode=flaky&failCount=2\",\n  \"eventId\": \"evt_flaky_{{$timestamp}}\",\n  \"payload\": {\n    \"event\": \"order.paid\",\n    \"amount\": 4900\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/webhooks/dispatch"
+      }
+    },
+    {
+      "name": "4. Dispatch Simulated Outage (503 -> 3 Retries -> DLQ)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"destinationUrl\": \"{{baseUrl}}/api/mock/receiver?mode=fail500\",\n  \"eventId\": \"evt_outage_{{$timestamp}}\",\n  \"payload\": {\n    \"event\": \"payment.failed\",\n    \"userId\": \"usr_999\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/webhooks/dispatch"
+      }
+    },
+    {
+      "name": "5. Inspect Job & Attempt Logs",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/webhooks/jobs/{{jobId}}"
+      }
+    },
+    {
+      "name": "6. List Recent Jobs",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/webhooks/jobs?limit=20"
+      }
+    },
+    {
+      "name": "7. Replay Failed Job",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/webhooks/jobs/{{jobId}}/replay"
+      }
+    },
+    {
+      "name": "8. System Metrics & Token Buckets",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/metrics"
+      }
+    },
+    {
+      "name": "9. Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    }
+  ]
+}

@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PulseHook — Distributed Webhook Dispatcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-grad: linear-gradient(135deg, #f4f7ff 0%, #eef9ff 48%, #fdf2f8 100%);
+      --card: rgba(255, 255, 255, 0.94);
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --indigo: #4f46e5;
+      --indigo-soft: #eef2ff;
+      --cyan: #0891b2;
+      --cyan-soft: #ecfeff;
+      --emerald: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --rose: #e11d48;
+      --rose-soft: #fff1f2;
+      --violet: #7c3aed;
+      --violet-soft: #f5f3ff;
+      --shadow: 0 10px 30px -10px rgba(79, 70, 229, 0.12), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg-grad);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      padding: 24px 20px 44px;
+    }
+
+    .container { max-width: 1260px; margin: 0 auto; display: grid; gap: 20px; }
+
+    /* Top Header */
+    .topbar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 22px;
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      width: 44px; height: 44px; border-radius: 13px;
+      background: linear-gradient(135deg, #4f46e5, #06b6d4, #ec4899);
+      display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 1.2rem;
+      box-shadow: 0 8px 18px rgba(79, 70, 229, 0.28);
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+    .nav-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .nav-link {
+      text-decoration: none; font-size: 0.8rem; font-weight: 600;
+      padding: 7px 12px; border-radius: 999px;
+      background: #f8fafc; color: #334155; border: 1px solid var(--border);
+      transition: all 0.15s ease;
+    }
+    .nav-link:hover { background: var(--indigo-soft); color: var(--indigo); border-color: #c7d2fe; }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 13px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      background: var(--emerald-soft); color: var(--emerald); border: 1px solid #a7f3d0;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--emerald);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.55); }
+      70% { box-shadow: 0 0 0 8px rgba(5, 150, 105, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+    }
+
+    /* Architecture Flow Ribbon */
+    .pipeline {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 18px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+      align-items: center;
+    }
+    .stage {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 12px;
+      border: 1px solid transparent;
+    }
+    .stage.s1 { background: var(--indigo-soft); border-color: #c7d2fe; }
+    .stage.s2 { background: var(--cyan-soft); border-color: #a5f3fc; }
+    .stage.s3 { background: var(--amber-soft); border-color: #fde68a; }
+    .stage.s4 { background: var(--emerald-soft); border-color: #a7f3d0; }
+    .stage-num {
+      width: 26px; height: 26px; border-radius: 8px; font-weight: 800; font-size: 0.78rem;
+      display: grid; place-items: center; color: #fff; flex-shrink: 0;
+    }
+    .s1 .stage-num { background: var(--indigo); }
+    .s2 .stage-num { background: var(--cyan); }
+    .s3 .stage-num { background: var(--amber); }
+    .s4 .stage-num { background: var(--emerald); }
+    .stage-title { font-size: 0.8rem; font-weight: 700; }
+    .stage-desc { font-size: 0.72rem; color: var(--muted); }
+
+    /* KPI Grid */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    }
+    .kpi.k-indigo::before { background: linear-gradient(90deg, #4f46e5, #6366f1); }
+    .kpi.k-emerald::before { background: linear-gradient(90deg, #059669, #10b981); }
+    .kpi.k-rose::before { background: linear-gradient(90deg, #e11d48, #f43f5e); }
+    .kpi.k-amber::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .kpi-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+    .kpi-val { font-size: 2rem; font-weight: 800; margin: 6px 0 2px; letter-spacing: -0.03em; }
+    .kpi-sub { font-size: 0.76rem; color: var(--muted); }
+
+    /* Main Split Panels */
+    .split { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 18px; }
+    @media (max-width: 960px) { .split { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .card-title { margin: 0; font-size: 1.02rem; font-weight: 800; }
+    .tag {
+      font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+      background: var(--violet-soft); color: var(--violet);
+    }
+
+    /* Mode Chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+    .chip {
+      border: 1px solid var(--border); background: #f8fafc; color: #334155;
+      border-radius: 999px; padding: 6px 11px; font-size: 0.76rem; font-weight: 600;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .chip:hover { transform: translateY(-1px); border-color: #a5b4fc; }
+    .chip.active {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+
+    label { display: block; font-size: 0.76rem; font-weight: 600; color: #475569; margin: 10px 0 5px; }
+    input, textarea {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 10px;
+      padding: 9px 12px; font-size: 0.84rem; color: var(--text);
+      background: #ffffff; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+    }
+
+    .btn-row { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
+    .btn {
+      border: 0; border-radius: 10px; padding: 9px 15px; font-size: 0.82rem; font-weight: 700;
+      cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease;
+      color: #fff;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary {
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      box-shadow: 0 6px 14px rgba(79, 70, 229, 0.28);
+    }
+    .btn-burst {
+      background: linear-gradient(135deg, #ea580c, #f59e0b);
+      box-shadow: 0 6px 14px rgba(234, 88, 12, 0.24);
+    }
+    .btn-hol {
+      background: linear-gradient(135deg, #0891b2, #10b981);
+      box-shadow: 0 6px 14px rgba(8, 145, 178, 0.24);
+    }
+    .btn-sm {
+      padding: 5px 10px; font-size: 0.74rem; border-radius: 8px;
+      background: var(--indigo-soft); color: var(--indigo); border: 1px solid #c7d2fe;
+      font-weight: 700; cursor: pointer;
+    }
+
+    .latency-banner {
+      margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+      background: #f8fafc; border: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace; font-size: 0.76rem;
+      max-height: 155px; overflow: auto; white-space: pre-wrap;
+    }
+
+    /* Tables & Progress Bars */
+    table { width: 100%; border-collapse: collapse; font-size: 0.81rem; }
+    th {
+      text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--muted); padding: 9px 8px; border-bottom: 2px solid #f1f5f9;
+    }
+    td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.77rem; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+    }
+    .pill.success, .pill.CLOSED { background: var(--emerald-soft); color: var(--emerald); }
+    .pill.queued { background: var(--indigo-soft); color: var(--indigo); }
+    .pill.processing { background: var(--cyan-soft); color: var(--cyan); }
+    .pill.retrying, .pill.HALF_OPEN { background: var(--amber-soft); color: var(--amber); }
+    .pill.failed, .pill.OPEN { background: var(--rose-soft); color: var(--rose); }
+
+    .bar-wrap { width: 92px; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+    .bar-tokens { background: linear-gradient(90deg, #06b6d4, #4f46e5); }
+    .bar-health-ok { background: linear-gradient(90deg, #10b981, #34d399); }
+    .bar-health-warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .bar-health-bad { background: linear-gradient(90deg, #e11d48, #fb7185); }
+
+    /* Filter Tabs */
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tab {
+      border: 1px solid var(--border); background: #fff; color: var(--muted);
+      padding: 5px 11px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    }
+    .tab.active { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+
+    /* Attempt Timeline */
+    .timeline { display: grid; gap: 10px; margin-top: 12px; }
+    .attempt-item {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+      padding: 11px 14px; border-radius: 12px; border: 1px solid var(--border); background: #f8fafc;
+    }
+    .attempt-left { display: flex; align-items: center; gap: 10px; }
+    .attempt-badge {
+      width: 28px; height: 28px; border-radius: 8px; font-weight: 800; font-size: 0.76rem;
+      display: grid; place-items: center; color: #fff;
+    }
+    .attempt-badge.success { background: var(--emerald); }
+    .attempt-badge.retrying { background: var(--amber); }
+    .attempt-badge.failed { background: var(--rose); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">PH</div>
+        <div>
+          <h1>PulseHook — Distributed Webhook Dispatcher</h1>
+          <div class="subtitle">Python + FastAPI + Asyncio Engine • Persistent WAL/Postgres Queue • Per-Domain Token Bucket &amp; Circuit Breaker</div>
+        </div>
+      </div>
+      <div class="nav-pills">
+        <span class="live-badge" id="engineBadge"><span class="pulse-dot"></span> Connecting...</span>
+        <a class="nav-link" href="/docs" target="_blank">Swagger API Docs</a>
+        <a class="nav-link" href="/api/metrics" target="_blank">Live Metrics JSON</a>
+        <a class="nav-link" href="/health" target="_blank">Health Probe</a>
+      </div>
+    </header>
+
+    <!-- Live Architecture Pipeline Strip -->
+    <section class="pipeline">
+      <div class="stage s1">
+        <div class="stage-num">1</div>
+        <div>
+          <div class="stage-title">Non-Blocking Ingress</div>
+          <div class="stage-desc">202 Accepted + Idempotency + Sliding Window</div>
+        </div>
+      </div>
+      <div class="stage s2">
+        <div class="stage-num">2</div>
+        <div>
+          <div class="stage-title">Durable Queue</div>
+          <div class="stage-desc" id="pipeQueueDesc">SQLite WAL / Postgres SKIP LOCKED</div>
+        </div>
+      </div>
+      <div class="stage s3">
+        <div class="stage-num">3</div>
+        <div>
+          <div class="stage-title">Domain Guardrails</div>
+          <div class="stage-desc">Token Bucket (No HoL) + Circuit Breaker</div>
+        </div>
+      </div>
+      <div class="stage s4">
+        <div class="stage-num">4</div>
+        <div>
+          <div class="stage-title">Resilient Delivery</div>
+          <div class="stage-desc">HMAC-SHA256 + 2s/4s/8s Backoff + DLQ</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Cards -->
+    <section class="kpi-grid">
+      <div class="kpi k-indigo">
+        <div class="kpi-label">Active / Queued</div>
+        <div class="kpi-val" style="color:var(--indigo)" id="statPending">0</div>
+        <div class="kpi-sub" id="statInflight">Worker in-flight: 0 / 16</div>
+      </div>
+      <div class="kpi k-emerald">
+        <div class="kpi-label">Delivered (2xx)</div>
+        <div class="kpi-val" style="color:var(--emerald)" id="statSuccess">0</div>
+        <div class="kpi-sub" id="statDispatched">Total attempts sent: 0</div>
+      </div>
+      <div class="kpi k-rose">
+        <div class="kpi-label">Dead Letter (Failed)</div>
+        <div class="kpi-val" style="color:var(--rose)" id="statFailed">0</div>
+        <div class="kpi-sub">Exhausted retries or permanent 4xx</div>
+      </div>
+      <div class="kpi k-amber">
+        <div class="kpi-label">Rate / Circuit Deferred</div>
+        <div class="kpi-val" style="color:var(--amber)" id="statDeferred">0</div>
+        <div class="kpi-sub">Rescheduled without losing retry quota</div>
+      </div>
+    </section>
+
+    <!-- Simulator + Domain Rate Limiters -->
+    <section class="split">
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Interactive Chaos &amp; Load Simulator</h2>
+          <span class="tag">Built-in Mock Receiver</span>
+        </div>
+
+        <div class="chips" id="modeChips">
+          <button class="chip active" data-mode="ok" onclick="selectMode(this)">Healthy (200 OK)</button>
+          <button class="chip" data-mode="slow&delayMs=10000" onclick="selectMode(this)">10s Slow (200 OK)</button>
+          <button class="chip" data-mode="flaky&failCount=2" onclick="selectMode(this)">Flaky (2x 503 -> 200)</button>
+          <button class="chip" data-mode="fail500" onclick="selectMode(this)">Outage (503 -> DLQ)</button>
+          <button class="chip" data-mode="ratelimit" onclick="selectMode(this)">429 Retry-After</button>
+          <button class="chip" data-mode="badrequest" onclick="selectMode(this)">400 Fail Fast</button>
+        </div>
+
+        <label>Destination URL</label>
+        <input id="destUrl" />
+
+        <label>Webhook Payload JSON</label>
+        <textarea id="payloadBox" rows="3">{"event":"user.signup","userId":"usr_999","plan":"pro"}</textarea>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="dispatchOne()">Send 1 Webhook</button>
+          <button class="btn btn-burst" onclick="dispatchBurst(15)">Rapid-Fire Burst (15x)</button>
+          <button class="btn btn-hol" onclick="testDomainIsolation()">Test Domain Isolation</button>
+        </div>
+
+        <div class="latency-banner" id="dispatchResult">Ready. Click any action above to test non-blocking 202 ingestion.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Per-Domain Token Buckets &amp; Health Diagnostics</h2>
+          <span class="tag" style="background:var(--cyan-soft);color:var(--cyan)">Live Telemetry</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Domain</th>
+              <th>Token Bucket</th>
+              <th>In-Flight</th>
+              <th>Circuit</th>
+              <th>Health &amp; EWMA</th>
+            </tr>
+          </thead>
+          <tbody id="domainsBody">
+            <tr><td colspan="5" style="color:var(--muted)">Dispatch a webhook to inspect live per-domain buckets &amp; anomaly diagnostics.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Jobs Table & Attempt Timeline -->
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Webhook Jobs &amp; Delivery Attempt Logs</h2>
+        <div class="tabs" id="filterTabs">
+          <button class="tab active" data-filter="" onclick="setFilter(this)">All</button>
+          <button class="tab" data-filter="queued" onclick="setFilter(this)">Queued</button>
+          <button class="tab" data-filter="retrying" onclick="setFilter(this)">Retrying</button>
+          <button class="tab" data-filter="success" onclick="setFilter(this)">Success</button>
+          <button class="tab" data-filter="failed" onclick="setFilter(this)">Failed (DLQ)</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Job ID</th>
+              <th>Event ID</th>
+              <th>Domain</th>
+              <th>Status</th>
+              <th>Attempts</th>
+              <th>Last HTTP</th>
+              <th>Last Error</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="jobsBody"></tbody>
+        </table>
+      </div>
+
+      <div id="jobInspector" style="margin-top:16px; display:none; border-top:1px solid var(--border); padding-top:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <strong style="font-size:0.92rem">Delivery Timeline:</strong>
+            <span class="mono" id="inspectJobTitle" style="color:var(--indigo); font-weight:700"></span>
+          </div>
+          <span class="mono" id="inspectMeta" style="color:var(--muted)"></span>
+        </div>
+        <div class="timeline" id="attemptTimeline"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let currentMode = 'ok';
+    let currentFilter = '';
+    let selectedJobId = null;
+
+    function syncUrl() {
+      document.getElementById('destUrl').value =
+        window.location.origin + '/api/mock/receiver?mode=' + currentMode;
+    }
+    syncUrl();
+
+    function selectMode(btn) {
+      document.querySelectorAll('#modeChips .chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      syncUrl();
+    }
+
+    function setFilter(btn) {
+      document.querySelectorAll('#filterTabs .tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      refresh();
+    }
+
+    function parsePayload() {
+      try {
+        const parsed = JSON.parse(document.getElementById('payloadBox').value);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Payload must be a JSON object');
+        }
+        return parsed;
+      } catch (e) {
+        document.getElementById('dispatchResult').textContent = 'Invalid JSON payload: ' + e.message;
+        return null;
+      }
+    }
+
+    async function dispatchOne() {
+      const destinationUrl = document.getElementById('destUrl').value.trim();
+      const payload = parsePayload();
+      if (!payload) return;
+      const eventId = 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      try {
+        const t0 = performance.now();
+        const res = await fetch('/api/webhooks/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destinationUrl, eventId, payload })
+        });
+        const elapsed = (performance.now() - t0).toFixed(1);
+        const data = await res.json();
+        if (data.jobId) selectedJobId = data.jobId;
+        document.getElementById('dispatchResult').textContent =
+          'HTTP ' + res.status + (res.ok ? ' Accepted' : ' Error') + ' in ' + elapsed + ' ms\n' + JSON.stringify(data, null, 2);
+        refresh();
+      } catch (e) {
+        document.getElementById('dispatchResult').textContent = 'Network error: ' + e.message;
+      }
+    }
+
+    async function dispatchBurst(n) {
+      const destinationUrl = document.getElementById('destUrl').value.trim();
+      const payload = parsePayload();
+      if (!payload) return;
+      try {
+        const t0 = performance.now();
+        const responses = await Promise.all(Array.from({ length: n }, (_, i) =>
+          fetch('/api/webhooks/dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              destinationUrl,
+              eventId: 'evt_burst_' + Date.now() + '_' + i,
+              payload: { ...payload, burstIndex: i }
+            })
+          }).then(async r => ({ status: r.status, body: await r.json() }))
+        ));
+        const elapsed = (performance.now() - t0).toFixed(1);
+        const counts = responses.reduce((acc, r) => {
+          acc[r.status] = (acc[r.status] || 0) + 1;
+          return acc;
+        }, {});
+        document.getElementById('dispatchResult').textContent =
+          'Rapid-fire ' + n + ' concurrent requests finished in ' + elapsed + ' ms\nStatus summary: ' + JSON.stringify(counts);
+        refresh();
+      } catch (e) {
+        document.getElementById('dispatchResult').textContent = 'Burst error: ' + e.message;
+      }
+    }
+
+    async function testDomainIsolation() {
+      const base = window.location.origin;
+      const host = window.location.hostname;
+      let hostA = base;
+      if (host === 'localhost') hostA = base.replace('localhost', '127.0.0.1');
+      else if (host === '127.0.0.1') hostA = base.replace('127.0.0.1', 'localhost');
+      const payload = parsePayload();
+      if (!payload) return;
+      try {
+        const calls = [];
+        for (let i = 0; i < 6; i++) {
+          calls.push(fetch('/api/webhooks/dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              destinationUrl: hostA + '/api/mock/receiver?mode=slow&delayMs=2500&bucket=domA',
+              eventId: 'evt_domA_' + Date.now() + '_' + i,
+              payload
+            })
+          }));
+        }
+        calls.push(fetch('/api/webhooks/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            destinationUrl: base + '/api/mock/receiver?mode=ok&bucket=domB',
+            eventId: 'evt_domB_' + Date.now(),
+            payload
+          })
+        }));
+        await Promise.all(calls);
+        document.getElementById('dispatchResult').textContent =
+          hostA !== base
+            ? 'Dispatched 6 slow jobs to ' + new URL(hostA).host + ' and 1 healthy job to ' + new URL(base).host + '.\nHealthy domain finishes immediately without Head-of-Line blocking!'
+            : 'Dispatched 6 slow jobs + 1 healthy job. Look at Jobs table: healthy job completes immediately while slow jobs run in parallel!';
+        refresh();
+      } catch (e) {
+        document.getElementById('dispatchResult').textContent = 'Isolation test error: ' + e.message;
+      }
+    }
+
+    async function inspectJob(jobId) {
+      selectedJobId = jobId;
+      const res = await fetch('/api/webhooks/jobs/' + jobId);
+      if (!res.ok) return;
+      const data = await res.json();
+      const box = document.getElementById('jobInspector');
+      box.style.display = 'block';
+      document.getElementById('inspectJobTitle').textContent = data.job.id + ' (' + data.job.eventId + ')';
+      document.getElementById('inspectMeta').textContent =
+        'Target: ' + data.job.destinationUrl + ' | Status: ' + data.job.status.toUpperCase();
+
+      const tl = document.getElementById('attemptTimeline');
+      if (!data.attempts.length) {
+        tl.innerHTML = '<div style="color:var(--muted);font-size:0.82rem">Waiting for worker pickup...</div>';
+        return;
+      }
+      tl.innerHTML = data.attempts.map(a =>
+        '<div class="attempt-item">' +
+          '<div class="attempt-left">' +
+            '<div class="attempt-badge ' + a.status + '">#' + a.attemptNumber + '</div>' +
+            '<div>' +
+              '<div><strong>' + a.status.toUpperCase() + '</strong> — HTTP ' + (a.responseCode ?? 'NETWORK_ERR') + ' <span style="color:var(--muted)">(' + a.durationMs + ' ms)</span></div>' +
+              '<div class="mono" style="color:var(--muted)">' + (a.errorMessage || a.responseSnippet || 'Delivered & HMAC signed') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="mono" style="color:var(--muted)">' + new Date(a.createdAt).toLocaleTimeString() + '</div>' +
+        '</div>'
+      ).join('');
+    }
+
+    async function replayJob(jobId) {
+      await fetch('/api/webhooks/jobs/' + jobId + '/replay', { method: 'POST' });
+      selectedJobId = jobId;
+      refresh();
+    }
+
+    async function refresh() {
+      try {
+        const jobsUrl = '/api/webhooks/jobs?limit=15' + (currentFilter ? '&status=' + currentFilter : '');
+        const [mRes, jRes] = await Promise.all([fetch('/api/metrics'), fetch(jobsUrl)]);
+        const m = await mRes.json();
+        const j = await jRes.json();
+
+        document.getElementById('engineBadge').innerHTML =
+          '<span class="pulse-dot"></span> ' + m.storageEngine.toUpperCase() + ' • Worker Active';
+        document.getElementById('pipeQueueDesc').textContent =
+          m.storageEngine === 'postgres' ? 'PostgreSQL SKIP LOCKED' : 'Embedded SQLite WAL Mode';
+
+        document.getElementById('statPending').textContent = m.jobs.queued + m.jobs.retrying + m.jobs.processing;
+        document.getElementById('statInflight').textContent =
+          'Worker in-flight: ' + m.worker.activeInFlight + ' / ' + m.worker.maxConcurrency;
+        document.getElementById('statSuccess').textContent = m.jobs.success;
+        document.getElementById('statDispatched').textContent = 'Total attempts sent: ' + m.worker.totalDispatched;
+        document.getElementById('statFailed').textContent = m.jobs.failed;
+        document.getElementById('statDeferred').textContent = m.worker.totalDeferred;
+
+        const dBody = document.getElementById('domainsBody');
+        dBody.innerHTML = m.domains.length
+          ? m.domains.map(d => {
+              const tokenPct = Math.min(100, Math.round((d.availableTokens / d.capacity) * 100));
+              const healthClass = d.healthScore >= 80 ? 'bar-health-ok' : d.healthScore >= 50 ? 'bar-health-warn' : 'bar-health-bad';
+              return '<tr>' +
+                '<td class="mono"><strong>' + d.domain + '</strong><div style="color:var(--muted);font-size:0.71rem">Deferred: ' + d.deferredCount + '</div></td>' +
+                '<td><div class="mono">' + d.availableTokens + ' / ' + d.capacity + '</div><div class="bar-wrap"><div class="bar-fill bar-tokens" style="width:' + tokenPct + '%"></div></div></td>' +
+                '<td class="mono">' + d.inflight + ' / ' + d.maxInflight + '</td>' +
+                '<td><span class="pill ' + d.circuitState + '">' + d.circuitState + '</span></td>' +
+                '<td><div class="mono">' + d.healthScore + '% ' + (d.ewmaLatencyMs !== null ? '(' + d.ewmaLatencyMs + 'ms)' : '') + '</div><div class="bar-wrap"><div class="bar-fill ' + healthClass + '" style="width:' + d.healthScore + '%"></div></div><div style="font-size:0.71rem;color:var(--muted)">' + d.diagnostic + '</div></td>' +
+              '</tr>';
+            }).join('')
+          : '<tr><td colspan="5" style="color:var(--muted)">Dispatch a webhook to inspect live per-domain buckets &amp; anomaly diagnostics.</td></tr>';
+
+        const jBody = document.getElementById('jobsBody');
+        const nowMs = Date.now();
+        jBody.innerHTML = j.jobs.length
+          ? j.jobs.map(job => {
+              let statusExtra = '';
+              if (job.status === 'retrying' && job.nextRunAt > nowMs) {
+                statusExtra = ' (' + ((job.nextRunAt - nowMs) / 1000).toFixed(1) + 's)';
+              }
+              return '<tr>' +
+                '<td><a href="#" class="mono" style="color:var(--indigo);font-weight:700;text-decoration:none" onclick="inspectJob(\'' + job.id + '\');return false;">' + job.id + '</a></td>' +
+                '<td class="mono">' + job.eventId + '</td>' +
+                '<td class="mono">' + job.destinationDomain + '</td>' +
+                '<td><span class="pill ' + job.status + '">' + job.status + statusExtra + '</span></td>' +
+                '<td class="mono">' + job.attemptCount + ' / ' + (job.maxRetries + 1) + '</td>' +
+                '<td class="mono">' + (job.lastStatusCode ?? '-') + '</td>' +
+                '<td class="mono" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">' + (job.lastError ?? '-') + '</td>' +
+                '<td>' + (job.status === 'failed' ? '<button class="btn-sm" onclick="replayJob(\'' + job.id + '\')">Replay</button>' : '<button class="btn-sm" onclick="inspectJob(\'' + job.id + '\')">Inspect</button>') + '</td>' +
+              '</tr>';
+            }).join('')
+          : '<tr><td colspan="8" style="color:var(--muted)">No webhook jobs recorded yet.</td></tr>';
+
+        if (selectedJobId) {
+          await inspectJob(selectedJobId);
+        }
+      } catch (err) {}
+    }
+
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>
