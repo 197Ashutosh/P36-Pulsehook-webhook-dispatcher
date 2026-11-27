@@ -240,15 +240,4 @@ tests/                       # Unit, integration, and 50-burst stress tests
 
 ---
 
-## Deployment (Free Tier Ready)
 
-Includes `Dockerfile`, `render.yaml`, and `fly.toml`.
-
-### Option A: Render (Recommended Free Tier)
-1. Push this repository to GitHub.
-2. In Render Dashboard, choose **New + -> Blueprint** (auto-detects `render.yaml`) or **Web Service -> Docker**.
-3. Verify `GET https://pulsehook-webhook-dispatcher.onrender.com/health` returns `200 OK`.
-
-### Option B: Railway / Fly.io
-- **Railway:** Connect GitHub repo -> automatically detects `Dockerfile` -> generate public domain.
-- **Fly.io:** `fly launch --copy-config && fly deploy`.
